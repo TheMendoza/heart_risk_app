@@ -1,0 +1,3198 @@
+Loading and combining files into one dataframe
+
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    print(combined_df.head())  # Display the first few rows of the combined DataFrame
+else:
+    print("No dataframes were loaded.")
+
+combined_df.info()
+combined_df.head()
+
+Type: Person search, Person and Vehicle search
+Date: 2023-01-01T00:00:00+00:00 (perhaps change this to just dates?)
+Latitude
+Longitude
+Gender: Male, Female, Other
+Age: 18-24, 25-34, over 34, Under 10
+Self-defined ethnicity: Asian/Asian British - Any other Asian background, Asian/Asian British - Bangladeshi,  Asian/Asian British - Chinese, Asian/Asian British - Indian, Asian/Asian British - Pakistani, Black/African/Caribbean/Black British - African, Black/African/Caribbean/Black British - Any other Black/African/Caribbean background, Black/African/Caribbean/Black British - Caribbean, Mixed/Multiple ethnic groups - Any other Mixed/Multiple ethnic background, Mixed/Multiple ethnic groups - White and Asian, Mixed/Multiple ethnic groups - White and Black African, Mixed/Multiple ethnic groups - White and Black Caribbean, Other ethnic group - Any other ethnic group, Other ethnic group - Not stated, White - Any other White background, White - English/Welsh/Scottish/Northern Irish/British, White - Irish
+Officer-defined-ethnicity: Asian, Black, White, Other
+Object of search: Anything to threaten or harm anyone, Articles for use in criminal damage, Controlled drugs, Evidence of offences under the Act, Firearms, Fireworks, Offensive weapons, Stolen goods
+Outcome: a no further action disposal, Arrest, Caution (simple or conditional), Community resolution, Penalty Notice for Disorder, Summons / charged by post
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+1. Distribution of Searches by Type with Annotations
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    ax.annotate(f'{p.get_height()}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+
+2. Searches Over Time with Trend Line
+
+plt.figure(figsize=(12, 8))
+combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+combined_df['Month'] = combined_df['Date'].dt.to_period('M')
+
+searches_over_time = combined_df['Month'].value_counts().sort_index()
+searches_over_time.plot(kind='line', marker='o', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+
+# Highlight the highest and lowest points
+max_searches = searches_over_time.max()
+min_searches = searches_over_time.min()
+max_month = searches_over_time.idxmax()
+min_month = searches_over_time.idxmin()
+
+plt.annotate(f'Highest: {max_searches}', xy=(max_month.start_time, max_searches), 
+             xytext=(max_month.start_time, max_searches + 50),
+             arrowprops=dict(facecolor='green', shrink=0.05))
+
+plt.annotate(f'Lowest: {min_searches}', xy=(min_month.start_time, min_searches), 
+             xytext=(min_month.start_time, min_searches + 50),
+             arrowprops=dict(facecolor='red', shrink=0.05))
+
+plt.show()
+
+3. Distribution of Searches by Age Range with Annotations
+
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Age range')
+plt.title('Age Range Distribution of Searches')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+
+4.Outcome by Age Range
+
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age range', hue='Outcome')
+plt.title('Outcome by Age Range')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+plt.show()
+
+5. Frequency Heatmap - "Age range", "Officer-defined ethnicity", and "Outcome". We'll use the pd.crosstab() function to generate a frequency table and then plot it as a heatmap.
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Fill NaN values with a placeholder (e.g., 'Unknown' or -1)
+combined_df = combined_df.fillna('Unknown')
+
+# Create a frequency table for Age range vs Officer-defined ethnicity
+age_officer_freq = pd.crosstab(combined_df['Age range'], combined_df['Officer-defined ethnicity'])
+
+# Plot the frequency heatmap for Age range vs Officer-defined ethnicity
+plt.figure(figsize=(12, 8))
+sns.heatmap(age_officer_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Age range vs Officer-defined ethnicity')
+plt.xlabel('Officer-defined ethnicity')
+plt.ylabel('Age range')
+plt.show()
+
+# Create a frequency table for Age range vs Outcome
+age_outcome_freq = pd.crosstab(combined_df['Age range'], combined_df['Outcome'])
+
+# Plot the frequency heatmap for Age range vs Outcome
+plt.figure(figsize=(12, 8))
+sns.heatmap(age_outcome_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Age range vs Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Age range')
+plt.show()
+
+# Create a frequency table for Officer-defined ethnicity vs Outcome
+officer_outcome_freq = pd.crosstab(combined_df['Officer-defined ethnicity'], combined_df['Outcome'])
+
+# Plot the frequency heatmap for Officer-defined ethnicity vs Outcome
+plt.figure(figsize=(12, 8))
+sns.heatmap(officer_outcome_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Officer-defined ethnicity vs Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Officer-defined ethnicity')
+plt.show()
+
+GeoSpatial - Heatmap
+
+import pandas as pd
+import folium
+from folium.plugins import HeatMap
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Fill NaN values with a placeholder (e.g., 'Unknown' or -1)
+combined_df = combined_df.fillna('Unknown')
+
+# Ensure that latitude and longitude are numeric
+combined_df['Latitude'] = pd.to_numeric(combined_df['Latitude'], errors='coerce')
+combined_df['Longitude'] = pd.to_numeric(combined_df['Longitude'], errors='coerce')
+
+# Drop rows with NaN values in Latitude and Longitude
+combined_df = combined_df.dropna(subset=['Latitude', 'Longitude'])
+
+# Create a base map
+map_center = [combined_df['Latitude'].mean(), combined_df['Longitude'].mean()]
+mymap = folium.Map(location=map_center, zoom_start=10)
+
+# Prepare data for the heatmap
+heat_data = [[row['Latitude'], row['Longitude']] for index, row in combined_df.iterrows()]
+
+# Add heatmap to the base map
+HeatMap(heat_data).add_to(mymap)
+
+# Save the map to an HTML file
+mymap.save('heatmap.html')
+
+# To display the map directly in a Jupyter notebook (if you are using one)
+#mymap
+
+
+
+Hello
+ChatGPT
+Hi there! How can I assist you today?
+
+I'm working with Python.
+C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01
+ChatGPT
+Great! How can I assist you with your Python project and the data located in C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01? Are you looking to analyze the data, clean it, visualize it, or something else? Let me know what specific help you need!
+
+I need to upload please
+ChatGPT
+Sure! You can upload the file from the directory C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01 here. Once uploaded, I can help you with whatever tasks you need to perform with the data.
+
+To upload the file, please follow these steps:
+
+Locate the file in the mentioned directory on your computer.
+Drag and drop the file into this chat window.
+Once the file is uploaded, we can proceed with your requirements.
+
+Using 64bit Python terminal
+ChatGPT
+Got it! If you're using a 64-bit Python terminal and want to work with the data in the C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01 directory, you'll need to write a Python script to read and process the data. Here's a step-by-step guide to get you started:
+
+Step 1: Import Necessary Libraries
+First, ensure you have the necessary libraries installed. You will likely need pandas for data manipulation. You can install it using pip if you haven't already:
+
+bash
+Copy code
+pip install pandas
+Step 2: Write the Python Script
+Here's a basic script to read and display the data. This example assumes the data is in CSV format. Adjust the file name and format as needed.
+
+python
+Copy code
+import pandas as pd
+import os
+
+# Define the path to the directory
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# List all files in the directory
+files = os.listdir(data_directory)
+
+# Filter for CSV files (or adjust the extension if needed)
+csv_files = [file for file in files if file.endswith('.csv')]
+
+# Loop through each CSV file and read it
+for csv_file in csv_files:
+    file_path = os.path.join(data_directory, csv_file)
+    try:
+        # Read the CSV file
+        data = pd.read_csv(file_path)
+        print(f"Data from {csv_file}:")
+        print(data.head())  # Display the first few rows of the dataframe
+    except Exception as e:
+        print(f"Error reading {csv_file}: {e}")
+Step 3: Execute the Script
+Save the script as read_data.py or any name you prefer.
+Open your 64-bit Python terminal.
+Navigate to the directory where you saved read_data.py.
+Run the script using:
+bash
+Copy code
+python read_data.py
+This script will print the first few rows of each CSV file in the specified directory. If your files are in a different format (e.g., Excel), you can adjust the reading method accordingly (pd.read_excel for Excel files, for instance).
+
+If you provide more details about the format of the files or specific tasks you need help with, I can tailor the script further to meet your needs.
+
+I have this code, but there's something wrong with it
+import pandas as pd
+import glob
+
+# Assuming all CSV files are in the same directory
+file_pattern = "C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01.csv"
+file_list = glob.glob(file_pattern)
+
+# Load data from each file into separate dataframes
+dfs = [pd.read_csv(file) for file in file_list]
+
+# Concatenate dataframes vertically
+combined_df = pd.concat(dfs, ignore_index=True)
+
+# Now combined_df contains data from all 12 months
+# You can further clean, analyze, or visualize the data as needed.
+ChatGPT
+It looks like there are a few issues with your code, particularly with the file pattern and path formatting. Here's a revised version of your script:
+
+Use raw string literals (r"string") to avoid escape characters in file paths.
+Correct the file pattern to match all CSV files in the directory.
+Here's the updated code:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+Directory Path: The data_directory variable is set to the path containing the CSV files. Using r before the string makes it a raw string, so backslashes are treated correctly.
+
+File Pattern: The os.path.join(data_directory, "*.csv") creates a pattern to match all CSV files in the specified directory.
+
+File List: glob.glob(file_pattern) finds all files matching the pattern.
+
+Check for Files: The script checks if any files are found and prints a message if no files are found.
+
+Reading Files: The script reads each file into a DataFrame, handles any errors that might occur, and stores the DataFrames in a list.
+
+Concatenation: If any DataFrames were successfully loaded, they are concatenated vertically into a single DataFrame, which is then printed.
+
+Save the script and run it as before. This should resolve the issues and correctly combine the data from your CSV files.
+
+
+2/2
+
+>>> import pandas as pd
+>>> import glob
+>>>
+>>> # Assuming all CSV files are in the same directory
+>>> file_pattern = "C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+  File "<stdin>", line 1
+    file_pattern = "C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes in position 2-3: truncated \UXXXXXXXX escape
+>>> file_list = glob.glob(file_pattern)
+>>>
+>>> # Load data from each file into separate dataframes
+>>> dfs = [pd.read_csv(file) for file in file_list]
+>>>
+>>> # Concatenate dataframes vertically
+>>> combined_df = pd.concat(dfs, ignore_index=True)
+>>>
+>>> # Now combined_df contains data from all 12 months
+>>> # You can further clean, analyze, or visualize the data as needed.
+ChatGPT
+The error you're encountering is due to the backslashes in the file path being interpreted as escape characters. To resolve this, you can either use raw string literals by prefixing the string with r or replace the backslashes with double backslashes \\.
+
+Here’s the corrected version of your script using a raw string literal:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+Raw String Literal: The path is defined using r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01" to handle backslashes correctly.
+
+File Pattern: os.path.join(data_directory, "*.csv") generates a pattern to match all CSV files in the specified directory.
+
+File List: glob.glob(file_pattern) finds all files matching the pattern.
+
+Error Handling: The script reads each file into a DataFrame, handles any errors, and stores the DataFrames in a list.
+
+Concatenation: If any DataFrames were successfully loaded, they are concatenated into a single DataFrame, which is then printed.
+
+This script should now correctly read and combine your CSV files. Run it in your Python environment to check if it works as expected.
+
+>>> import pandas as pd
+>>> import glob
+>>> import os
+>>>
+>>> # Define the directory containing the CSV files
+>>> data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+>>>
+>>> # Create a file pattern to match all CSV files in the directory
+>>> file_pattern = os.path.join(data_directory, "*.csv")
+>>>
+>>> # Use glob to find all files matching the pattern
+>>> file_list = glob.glob(file_pattern)
+>>>
+>>> # Check if any files are found
+>>> if not file_list:
+...     print("No CSV files found in the directory.")
+... else:
+...     # Load data from each file into separate dataframes
+...     dfs = []
+...     for file in file_list:
+...         try:
+...             df = pd.read_csv(file)
+...             dfs.append(df)
+...         except Exception as e:
+...             print(f"Error reading {file}: {e}")
+...
+>>>     # Concatenate dataframes vertically if any dataframes were loaded
+>>>     if dfs:
+  File "<stdin>", line 1
+    if dfs:
+IndentationError: unexpected indent
+>>>         combined_df = pd.concat(dfs, ignore_index=True)
+  File "<stdin>", line 1
+    combined_df = pd.concat(dfs, ignore_index=True)
+IndentationError: unexpected indent
+>>>         print("Data combined successfully!")
+  File "<stdin>", line 1
+    print("Data combined successfully!")
+IndentationError: unexpected indent
+>>>         print(combined_df.head())  # Display the first few rows of the combined dataframe
+  File "<stdin>", line 1
+    print(combined_df.head())  # Display the first few rows of the combined dataframe
+IndentationError: unexpected indent
+>>>     else:
+  File "<stdin>", line 1
+    else:
+IndentationError: unexpected indent
+>>>         print("No dataframes were loaded.")
+  File "<stdin>", line 1
+    print("No dataframes were loaded.")
+IndentationError: unexpected indent
+ChatGPT
+It looks like the indentation in your code is causing issues. This is a common problem in Python, where indentation is crucial for defining code blocks. Here's the corrected version of your script with proper indentation:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+Consistent Indentation: Make sure all the code inside the else block and the if dfs: block is properly indented with four spaces or one tab.
+
+No Mixed Indentation: Ensure you are not mixing tabs and spaces. Stick to one style, preferably spaces (four spaces per indentation level).
+
+Proper Block Closing: Ensure that each code block (like the ones for if, else, for, try, and except) is properly closed and that the indentation aligns correctly.
+
+Steps:
+Copy the corrected script above.
+Paste it into your Python terminal or save it as a .py file.
+Run the script to ensure it works correctly.
+This should resolve the IndentationError and allow the script to execute properly.
+
+Ok let's start again, I would like to load a file form my drive and the file path is
+C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01.csv
+ChatGPT
+Sure, let's start fresh and focus on loading the file located at C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01.csv. Below is a simple script to read this specific CSV file into a Pandas DataFrame:
+
+python
+Copy code
+import pandas as pd
+
+# Define the file path
+file_path = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01.csv"
+
+# Read the CSV file into a DataFrame
+try:
+    data = pd.read_csv(file_path)
+    print("File loaded successfully!")
+    print(data.head())  # Display the first few rows of the DataFrame
+except Exception as e:
+    print(f"Error reading the file: {e}")
+Explanation:
+File Path: The path is defined using a raw string literal (r"...") to handle backslashes correctly.
+Read CSV: The pd.read_csv(file_path) function reads the CSV file into a DataFrame.
+Error Handling: The try block captures any errors that occur while reading the file and prints an appropriate error message.
+Steps to Run the Script:
+Open your Python terminal or create a new Python script file (e.g., load_csv.py).
+Copy and paste the script above into your terminal or script file.
+Run the script.
+This will load the specified CSV file and display the first few rows of the DataFrame. If there's an error reading the file, the script will print an error message.
+
+Now I want to combine, something like this.
+# Assuming all CSV files are in the same directory
+file_pattern = "C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+file_list = glob.glob(file_pattern)
+
+# Load data from each file into separate dataframes
+dfs = [pd.read_csv(file) for file in file_list]
+
+# Concatenate dataframes vertically
+combined_df = pd.concat(dfs, ignore_index=True)
+
+# Now combined_df contains data from all 12 months
+# You can further clean, analyze, or visualize the data as needed.
+ChatGPT
+Let's combine all the CSV files in a specified directory into a single DataFrame. To achieve this, we'll use the glob module to list all CSV files in the directory and then read and concatenate them using pandas. Here's the corrected version of your script:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Create a file pattern to match all CSV files in the directory for the specific month
+file_pattern = os.path.join(data_directory, "2023-01", "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+Directory Path: The directory containing the CSV files is specified.
+File Pattern: A pattern is created to match all CSV files in the 2023-01 subdirectory.
+Glob: glob.glob(file_pattern) finds all files matching the pattern.
+Check for Files: The script checks if any files are found and prints a message if none are found.
+Reading Files: Each file is read into a DataFrame, and errors are handled if any occur.
+Concatenation: The DataFrames are concatenated vertically into a single DataFrame if any were successfully loaded.
+Steps to Run the Script:
+Save the script as combine_csv.py or any name you prefer.
+Open your Python terminal.
+Navigate to the directory where you saved combine_csv.py.
+Run the script using:
+bash
+Copy code
+python combine_csv.py
+This script will read all CSV files in the specified directory, combine them into a single DataFrame, and display the first few rows of the combined data. If there are any issues with reading the files, appropriate error messages will be printed.
+
+I think this is missing .csv?
+C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023
+ChatGPT
+You're right. If the directory contains only the CSV files for the specific month and they all have the .csv extension, we need to ensure the file pattern correctly includes the .csv extension.
+
+Here is the corrected script:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+File Pattern: The file pattern os.path.join(data_directory, "*.csv") ensures we match all .csv files in the specified directory.
+Reading Files: Each .csv file is read into a DataFrame.
+Steps to Run the Script:
+Save the script as combine_csv.py or any name you prefer.
+Open your Python terminal.
+Navigate to the directory where you saved combine_csv.py.
+Run the script using:
+bash
+Copy code
+python combine_csv.py
+This script will now correctly look for all CSV files in the specified directory, read them into separate DataFrames, and concatenate them into a single DataFrame.
+
+IndentationError: unexpected indent
+>>>         combined_df = pd.concat(dfs, ignore_index=True)
+  File "<stdin>", line 1
+    combined_df = pd.concat(dfs, ignore_index=True)
+IndentationError: unexpected indent
+>>>         print("Data combined successfully!")
+  File "<stdin>", line 1
+    print("Data combined successfully!")
+IndentationError: unexpected indent
+>>>         print(combined_df.head())  # Display the first few rows of the combined dataframe
+  File "<stdin>", line 1
+    print(combined_df.head())  # Display the first few rows of the combined dataframe
+IndentationError: unexpected indent
+>>>     else:
+  File "<stdin>", line 1
+    else:
+IndentationError: unexpected indent
+>>>         print("No dataframes were loaded.")
+  File "<stdin>", line 1
+    print("No dataframes were loaded.")
+IndentationError: unexpected indent
+ChatGPT
+The IndentationError indicates that there are issues with the alignment of your code blocks. Let's correct the indentation:
+
+Here's the revised script with proper indentation:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Explanation:
+Consistent Indentation: Ensure all indented blocks use four spaces per indentation level.
+Proper Block Closing: Each code block (like if, else, for, try, and except) must be properly indented and aligned.
+Steps to Run the Script:
+Save the script as combine_csv.py or any name you prefer.
+Open your Python terminal.
+Navigate to the directory where you saved combine_csv.py.
+Run the script using:
+bash
+Copy code
+python combine_csv.py
+This should resolve the IndentationError and allow the script to execute properly.
+
+Same error...
+ChatGPT
+It seems that the error might be due to mixed or incorrect indentation. Let's ensure the code is properly formatted and indented. Below is a version of the script with clear, consistent indentation:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Make sure the indentation is consistent with four spaces for each indentation level. Here's the complete script again, properly formatted:
+
+Correct Script:
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01"
+
+# Create a file pattern to match all CSV files in the directory
+file_pattern = os.path.join(data_directory, "*.csv")
+
+# Use glob to find all files matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if any files are found
+if not file_list:
+    print("No CSV files found in the directory.")
+else:
+    # Load data from each file into separate dataframes
+    dfs = []
+    for file in file_list:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    # Concatenate dataframes vertically if any dataframes were loaded
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        print("Data combined successfully!")
+        print(combined_df.head())  # Display the first few rows of the combined dataframe
+    else:
+        print("No dataframes were loaded.")
+Running the Script:
+Copy the script above.
+Save it in a file named combine_csv.py or a name of your choice.
+Open your Python terminal or command prompt.
+Navigate to the directory where combine_csv.py is saved.
+Run the script using:
+bash
+Copy code
+python combine_csv.py
+This should load all the CSV files from the specified directory, combine them, and print the first few rows of the combined DataFrame. If there are any issues, the script will print an appropriate error message.
+
+Lets start over.
+I would like to load my data to Python 64bit on my PC.
+The file path is: C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01
+ChatGPT
+Got it. Let's start with a fresh approach to load the data from the specified path.
+
+Here’s a step-by-step process to load your CSV file located at C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01\2023-01.csv into Python:
+
+Ensure your Python environment is ready.
+
+Install pandas if you haven't already:
+
+sh
+Copy code
+pip install pandas
+Write and execute the script to load the data.
+
+Here is the simple script to load your data:
+
+python
+Copy code
+import pandas as pd
+
+# Define the file path
+file_path = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01\2023-01.csv"
+
+# Read the CSV file into a DataFrame
+try:
+    data = pd.read_csv(file_path)
+    print("File loaded successfully!")
+    print(data.head())  # Display the first few rows of the DataFrame
+except Exception as e:
+    print(f"Error reading the file: {e}")
+Explanation:
+Import pandas: import pandas as pd
+Define the file path: Use a raw string (with an r prefix) to handle backslashes in Windows file paths.
+Read the CSV file: Use pd.read_csv(file_path) to load the file into a DataFrame.
+Error Handling: The try block captures any errors that occur while reading the file and prints an appropriate error message.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., load_data.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+If you are using an IDE, just run the script. If you are using the command line, navigate to the directory where the script is saved and run:
+
+sh
+Copy code
+python load_data.py
+This script will load the specified CSV file and display the first few rows of the DataFrame. If there's an error reading the file, the script will print an error message.
+
+Actually that location is consists of excel files for example:
+2023-01-metropolitan-stop-and-search (I only want this particular file name and it has 2023-01 for January, 2023-02 for February and so on
+ChatGPT
+Thank you for the clarification. Let's load the specified Excel file into a Pandas DataFrame. We will target the specific file pattern that matches 2023-01-metropolitan-stop-and-search.xlsx.
+
+Here’s a step-by-step script to achieve this:
+
+Ensure your Python environment is ready.
+
+Install pandas if you haven't already:
+
+sh
+Copy code
+pip install pandas
+Write and execute the script to load the data.
+
+Script to Load a Specific Excel File
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the Excel files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Define the file pattern to match the specific file for January
+file_pattern = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.xlsx")
+
+# Use glob to find the file matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if the file is found
+if not file_list:
+    print("No matching Excel file found in the directory.")
+else:
+    # There should be only one file matching the pattern
+    file_path = file_list[0]
+    
+    # Load the Excel file into a DataFrame
+    try:
+        data = pd.read_excel(file_path)
+        print("File loaded successfully!")
+        print(data.head())  # Display the first few rows of the DataFrame
+    except Exception as e:
+        print(f"Error reading the file: {e}")
+Explanation:
+Import pandas: import pandas as pd
+Import glob and os: These are used for file path manipulations and pattern matching.
+Define the directory: The directory containing the Excel files is specified.
+Define the file pattern: The pattern is set to match the specific Excel file for January.
+Use glob to find the file: glob.glob(file_pattern) finds the file matching the pattern.
+Check if the file is found: If not, print a message. If found, load the file.
+Read the Excel file: Use pd.read_excel(file_path) to load the file into a DataFrame.
+Error Handling: The try block captures any errors that occur while reading the file and prints an appropriate error message.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., load_excel.py).
+**Copy and paste the script
+It's actually a csv file sorry
+ChatGPT
+No problem. Let's adjust the script to load the specified CSV file instead. Here is the updated script that targets the specific CSV file for January:
+
+Script to Load a Specific CSV File
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Define the file pattern to match the specific file for January
+file_pattern = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.csv")
+
+# Use glob to find the file matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if the file is found
+if not file_list:
+    print("No matching CSV file found in the directory.")
+else:
+    # There should be only one file matching the pattern
+    file_path = file_list[0]
+    
+    # Load the CSV file into a DataFrame
+    try:
+        data = pd.read_csv(file_path)
+        print("File loaded successfully!")
+        print(data.head())  # Display the first few rows of the DataFrame
+    except Exception as e:
+        print(f"Error reading the file: {e}")
+Explanation:
+Import pandas: import pandas as pd
+Import glob and os: These are used for file path manipulations and pattern matching.
+Define the directory: The directory containing the CSV files is specified.
+Define the file pattern: The pattern is set to match the specific CSV file for January.
+Use glob to find the file: glob.glob(file_pattern) finds the file matching the pattern.
+Check if the file is found: If not, print a message. If found, load the file.
+Read the CSV file: Use pd.read_csv(file_path) to load the file into a DataFrame.
+Error Handling: The try block captures any errors that occur while reading the file and prints an appropriate error message.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., load_csv.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+If you are using an IDE, just run the script. If you are using the command line, navigate to the directory where the script is saved and run:
+
+sh
+Copy code
+python load_csv.py
+This script will load the specified CSV file for January and display the first few rows of the DataFrame. If there's an error reading the file, the script will print an error message.
+
+>>> import pandas as pd
+>>> import glob
+>>> import os
+>>>
+>>> # Define the directory containing the CSV files
+>>> data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+>>>
+>>> # Define the file pattern to match the specific file for January
+>>> file_pattern = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.csv")
+>>>
+>>> # Use glob to find the file matching the pattern
+>>> file_list = glob.glob(file_pattern)
+>>>
+>>> # Check if the file is found
+>>> if not file_list:
+...     print("No matching CSV file found in the directory.")
+... else:
+...     # There should be only one file matching the pattern
+...     file_path = file_list[0]
+...
+...     # Load the CSV file into a DataFrame
+...     try:
+...         data = pd.read_csv(file_path)
+...         print("File loaded successfully!")
+...         print(data.head())  # Display the first few rows of the DataFrame
+...     except Exception as e:
+...         print(f"Error reading the file: {e}")
+ChatGPT
+Your code looks good. However, there seems to be an indentation issue. Let's fix that and ensure it runs correctly. Here's the complete code:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Define the file pattern to match the specific file for January
+file_pattern = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.csv")
+
+# Use glob to find the file matching the pattern
+file_list = glob.glob(file_pattern)
+
+# Check if the file is found
+if not file_list:
+    print("No matching CSV file found in the directory.")
+else:
+    # There should be only one file matching the pattern
+    file_path = file_list[0]
+
+    # Load the CSV file into a DataFrame
+    try:
+        data = pd.read_csv(file_path)
+        print("File loaded successfully!")
+        print(data.head())  # Display the first few rows of the DataFrame
+    except Exception as e:
+        print(f"Error reading the file: {e}")
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., load_csv.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+If you are using an IDE, just run the script. If you are using the command line, navigate to the directory where the script is saved and run:
+
+sh
+Copy code
+python load_csv.py
+This script will load the specified CSV file for January and display the first few rows of the DataFrame. If there's an error reading the file, the script will print an error message.
+
+Doesnt work, same error
+ChatGPT
+Let's address this step-by-step. We'll check if the file exists, ensure the file path is correct, and then attempt to read the file.
+
+First, let's confirm the file exists using Python:
+
+python
+Copy code
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Define the file path to the specific file for January
+file_path = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.csv")
+
+# Check if the file exists
+if os.path.exists(file_path):
+    print("File exists!")
+else:
+    print("File does not exist.")
+Run this script to confirm whether the file exists at the specified location. If the file exists, the next step is to read the file into a DataFrame. If the file does not exist, there may be an issue with the file path or file name.
+
+If the file exists, proceed with the following script to load it into a DataFrame:
+
+python
+Copy code
+import pandas as pd
+import os
+
+# Define the directory containing the CSV files
+data_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# Define the file path to the specific file for January
+file_path = os.path.join(data_directory, "2023-01-metropolitan-stop-and-search.csv")
+
+# Check if the file exists
+if os.path.exists(file_path):
+    print("File exists!")
+
+    # Load the CSV file into a DataFrame
+    try:
+        data = pd.read_csv(file_path)
+        print("File loaded successfully!")
+        print(data.head())  # Display the first few rows of the DataFrame
+    except Exception as e:
+        print(f"Error reading the file: {e}")
+else:
+    print("File does not exist.")
+Explanation:
+Check File Existence: First, confirm the file exists using os.path.exists(file_path).
+Load the File: If the file exists, use pd.read_csv(file_path) to load it into a DataFrame.
+Error Handling: If an error occurs while reading the file, print an appropriate error message.
+Running the Script:
+Open your Python IDE or create a new Python script file (e.g., load_csv.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+sh
+Copy code
+python load_csv.py
+This will confirm whether the file exists at the specified location and attempt to read it into a DataFrame if it does. If there's still an error, it will provide a more specific error message to help diagnose the issue.
+
+Ok
+Location: C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-01
+File name: 2023-01-metropolitan-stop-and-search
+
+The above is for January
+
+For Feb
+Location: C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\2023-02
+File name: 2023-02-metropolitan-stop-and-search
+
+I want to combine All files into one dataset so I can have All metrpolitan police data from January to December  
+ChatGPT
+Thank you for the clarification. We can write a script that will look for all the monthly CSV files in the specified directories and combine them into a single DataFrame. We'll use glob to find the files and pandas to read and concatenate them.
+
+Here's the script to combine all the files from January to December:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    print(combined_df.head())  # Display the first few rows of the combined DataFrame
+else:
+    print("No dataframes were loaded.")
+Explanation:
+Define Base Directory: The base directory contains all the monthly directories.
+List for DataFrames: Create an empty list to store DataFrames.
+Loop Over Each Month: Loop from 1 to 12 to cover January to December.
+Format Month String: Ensure the month is formatted with two digits.
+Define Month Directory: Construct the path for the current month's directory.
+Define File Pattern: Create the pattern to match the current month's CSV file.
+Use glob to Find File: Use glob.glob to find files matching the pattern.
+Check if File Exists: Verify if the file exists, and if so, read it into a DataFrame.
+Append DataFrame to List: Append each month's DataFrame to the list.
+Concatenate DataFrames: Combine all DataFrames into one if any were loaded.
+Print Results: Display a message indicating success and show the first few rows of the combined DataFrame.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., combine_csvs.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+sh
+Copy code
+python combine_csvs.py
+This script will search for the specified CSV files from January to December, load them into DataFrames, and then combine them into a single DataFrame. If any files are missing or there are errors reading them, appropriate messages will be printed.
+
+I think that worked!! ty
+ChatGPT
+Great to hear that it worked! 🎉 If you have any more questions or need further assistance with your data or anything else, feel free to ask. Happy analyzing!
+
+
+2/2
+
+
+
+
+
+Here are the columns of my dataframe
+
+Type: Person search, Person and Vehicle search
+Date: 2023-01-01T00:00:00+00:00 (perhaps change this to just dates?)
+Latitude
+Longitude
+Gender: Male, Female, Other
+Age: 18-24, 25-34, over 34, Under 10
+Self-defined ethnicity: Asian/Asian British - Any other Asian background, Asian/Asian British - Bangladeshi,  Asian/Asian British - Chinese, Asian/Asian British - Indian, Asian/Asian British - Pakistani, Black/African/Caribbean/Black British - African, Black/African/Caribbean/Black British - Any other Black/African/Caribbean background, Black/African/Caribbean/Black British - Caribbean, Mixed/Multiple ethnic groups - Any other Mixed/Multiple ethnic background, Mixed/Multiple ethnic groups - White and Asian, Mixed/Multiple ethnic groups - White and Black African, Mixed/Multiple ethnic groups - White and Black Caribbean, Other ethnic group - Any other ethnic group, Other ethnic group - Not stated, White - Any other White background, White - English/Welsh/Scottish/Northern Irish/British, White - Irish
+Officer-defined-ethnicity: Asian, Black, White, Other
+Object search: Anything to threaten or harm anyone, Articles for use in criminal damage, Controlled drugs, Evidence of offences under the Act, Firearms, Fireworks, Offensive weapons, Stolen goods
+Outcome: a no further action disposal, Arrest, Caution (simple or conditional), Community resolution, Penalty Notice for Disorder, Summons / charged by post
+ChatGPT
+Great! To process and clean your DataFrame, we can address the following tasks:
+
+Convert the Date column to a standard date format without time and timezone.
+Ensure consistency in other columns if needed (like renaming or categorizing).
+Here's how you can achieve this:
+
+Convert Date Column
+We'll convert the Date column to a standard date format (YYYY-MM-DD) without the time and timezone.
+
+Script to Process the DataFrame
+python
+Copy code
+import pandas as pd
+
+# Assuming combined_df is your DataFrame
+# Convert the Date column to datetime and format it to only include the date part
+combined_df['Date'] = pd.to_datetime(combined_df['Date']).dt.date
+
+# Check the transformation
+print(combined_df.head())
+
+# If you need further processing, like renaming columns or ensuring consistency, you can add those steps here.
+# For example, renaming columns to ensure they are all lower case and replacing spaces with underscores:
+combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+
+# Check the column names
+print(combined_df.columns)
+
+# Save the cleaned DataFrame to a new CSV file if needed
+combined_df.to_csv(r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv', index=False)
+Explanation:
+Convert Date Column:
+pd.to_datetime(combined_df['Date']).dt.date converts the Date column to datetime format and extracts only the date part.
+Renaming Columns:
+combined_df.columns.str.lower().str.replace(' ', '_') makes all column names lower case and replaces spaces with underscores for consistency.
+Save the Cleaned DataFrame:
+combined_df.to_csv(...) saves the cleaned DataFrame to a new CSV file.
+Steps to Run the Script:
+Ensure you have the combined DataFrame (combined_df) from the previous steps.
+Add the script above after the DataFrame has been combined.
+Run the script to process the DataFrame and save the cleaned data.
+This will standardize the Date column and ensure your column names are consistent and easy to work with. If you have any other specific cleaning requirements, let me know, and I can help with those as well!
+
+Not sure what my data frame is right now, I ve only done what you asked me to which is this.
+import pandas as pd
+>>> import glob
+>>> import os
+>>>
+>>> # Define the base directory containing the monthly directories
+>>> base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+>>>
+>>> # List to store all dataframes
+>>> dfs = []
+>>>
+>>> # Loop over each month (1 to 12)
+>>> for month in range(1, 13):
+...     # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+...     month_str = f"{month:02d}"
+...
+...     # Define the directory for the current month
+...     month_directory = os.path.join(base_directory, f"2023-{month_str}")
+...
+...     # Define the file pattern to match the specific file for the current month
+...     file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+...
+...     # Use glob to find the file matching the pattern
+...     file_list = glob.glob(file_pattern)
+...
+...     # Check if the file is found
+...     if not file_list:
+...         print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+...     else:
+...         # There should be only one file matching the pattern
+...         file_path = file_list[0]
+...
+...         # Load the CSV file into a DataFrame
+...         try:
+...             df = pd.read_csv(file_path)
+...             dfs.append(df)
+...             print(f"File for 2023-{month_str} loaded successfully!")
+...         except Exception as e:
+...             print(f"Error reading the file for 2023-{month_str}: {e}")
+ChatGPT
+Based on your description, it seems like you've successfully loaded and combined your monthly CSV files into separate DataFrames stored in the list dfs. The next step is to concatenate these DataFrames into a single DataFrame and then perform the cleaning operations.
+
+Let's start by concatenating the DataFrames and then proceed with the cleaning steps.
+
+Full Script
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    
+    # Convert the Date column to datetime and format it to only include the date part
+    combined_df['Date'] = pd.to_datetime(combined_df['Date']).dt.date
+    
+    # Rename columns to ensure they are all lower case and replace spaces with underscores
+    combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Display the first few rows of the combined DataFrame to check the changes
+    print(combined_df.head())
+    
+    # Save the cleaned DataFrame to a new CSV file if needed
+    output_path = r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv'
+    combined_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+else:
+    print("No dataframes were loaded.")
+Explanation:
+Concatenate DataFrames:
+combined_df = pd.concat(dfs, ignore_index=True) combines all DataFrames in the dfs list into a single DataFrame.
+Convert Date Column:
+pd.to_datetime(combined_df['Date']).dt.date converts the Date column to datetime format and extracts only the date part.
+Rename Columns:
+combined_df.columns.str.lower().str.replace(' ', '_') makes all column names lower case and replaces spaces with underscores.
+Display First Few Rows:
+print(combined_df.head()) prints the first few rows of the combined DataFrame to check the changes.
+Save Cleaned DataFrame:
+combined_df.to_csv(output_path, index=False) saves the cleaned DataFrame to a new CSV file.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., combine_and_clean_csvs.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+sh
+Copy code
+python combine_and_clean_csvs.py
+This script will search for the specified CSV files from January to December, load them into DataFrames, combine them into a single DataFrame, clean the data, and save the cleaned DataFrame to a new CSV file. If any files are missing or there are errors reading them, appropriate messages will be printed.
+
+...     print("No dataframes
+  File "<stdin>", line 19
+    print("No dataframes
+          ^
+SyntaxError: unterminated string literal (detected at line 19)
+ChatGPT
+It looks like there was a typo causing the syntax error. Here's the corrected script:
+
+Corrected Script
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    
+    # Convert the Date column to datetime and format it to only include the date part
+    combined_df['Date'] = pd.to_datetime(combined_df['Date']).dt.date
+    
+    # Rename columns to ensure they are all lower case and replace spaces with underscores
+    combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Display the first few rows of the combined DataFrame to check the changes
+    print(combined_df.head())
+    
+    # Save the cleaned DataFrame to a new CSV file if needed
+    output_path = r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv'
+    combined_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+else:
+    print("No dataframes were loaded.")
+Explanation:
+Loop over Each Month: Ensure the month_str is formatted correctly for each month.
+Define Month Directory and File Pattern: Construct the correct paths for the current month's directory and file.
+Check if the File Exists: Verify if the file exists and print an appropriate message.
+Load the CSV File: Read the file into a DataFrame and append it to the list dfs.
+Concatenate DataFrames: Combine all DataFrames in the list dfs into a single DataFrame if any were loaded.
+Convert Date Column: Convert the Date column to datetime format and extract only the date part.
+Rename Columns: Standardize column names to lower case and replace spaces with underscores.
+Display First Few Rows: Print the first few rows of the combined DataFrame.
+Save Cleaned DataFrame: Save the cleaned DataFrame to a new CSV file.
+Steps to Run the Script:
+Open your Python IDE or create a new Python script file (e.g., combine_and_clean_csvs.py).
+**Copy and paste the corrected script above into your Python environment
+
+1/2
+
+Ok 
+ChatGPT
+Great! Let's make sure the script is correctly processing your data. Here’s a quick summary of what the script does:
+
+Imports necessary libraries.
+Defines the base directory where your monthly data is stored.
+Loops over each month to locate and load the corresponding CSV files.
+Combines all loaded data into a single DataFrame.
+Cleans and formats the data (standardizing date format and column names).
+Saves the cleaned data to a new CSV file.
+Complete Script
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+So how can I check.info etc?
+ChatGPT
+You can use several methods to check and inspect the combined DataFrame once it has been loaded and cleaned. Here are a few key methods you can use:
+
+.head(): Displays the first few rows of the DataFrame.
+.info(): Provides a concise summary of the DataFrame, including the data types of each column and the number of non-null values.
+.describe(): Generates descriptive statistics for numerical columns.
+.columns: Lists all the column names.
+.shape: Returns the number of rows and columns in the DataFrame.
+Adding Checks to Your Script
+You can add these checks after the DataFrame has been combined and cleaned. Here’s how you can integrate these methods into your script:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    
+    # Convert the Date column to datetime and format it to only include the date part
+    combined_df['Date'] = pd.to_datetime(combined_df['Date']).dt.date
+    
+    # Rename columns to ensure they are all lower case and replace spaces with underscores
+    combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Display the first few rows of the combined DataFrame to check the changes
+    print(combined_df.head())
+    
+    # Save the cleaned DataFrame to a new CSV file if needed
+    output_path = r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv'
+    combined_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+    
+    # Additional checks to inspect the DataFrame
+    print("\nDataFrame Info:")
+    print(combined_df.info())
+    
+    print("\nDataFrame Description:")
+    print(combined_df.describe())
+    
+    print("\nDataFrame Columns:")
+    print(combined_df.columns)
+    
+    print("\nDataFrame Shape:")
+    print(combined_df.shape)
+else:
+    print("No dataframes were loaded.")
+Explanation:
+.head(): Displays the first few rows of the DataFrame.
+.info(): Provides a concise summary of the DataFrame.
+.describe(): Generates descriptive statistics.
+.columns: Lists the column names.
+.shape: Returns the shape of the DataFrame (number of rows and columns).
+Running the Script:
+1
+
+How about null values
+ChatGPT
+To check for null values in your DataFrame, you can use the .isnull() and .sum() methods. This will give you the count of null values in each column. You can also use .isnull().any() to check if there are any null values in the entire DataFrame.
+
+Adding Null Value Checks to Your Script
+Here’s how you can integrate these checks into your script:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    
+    # Convert the Date column to datetime and format it to only include the date part
+    combined_df['date'] = pd.to_datetime(combined_df['date']).dt.date
+    
+    # Rename columns to ensure they are all lower case and replace spaces with underscores
+    combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Display the first few rows of the combined DataFrame to check the changes
+    print(combined_df.head())
+    
+    # Save the cleaned DataFrame to a new CSV file if needed
+    output_path = r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv'
+    combined_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+    
+    # Additional checks to inspect the DataFrame
+    print("\nDataFrame Info:")
+    print(combined_df.info())
+    
+    print("\nDataFrame Description:")
+    print(combined_df.describe())
+    
+    print("\nDataFrame Columns:")
+    print(combined_df.columns)
+    
+    print("\nDataFrame Shape:")
+    print(combined_df.shape)
+    
+    # Check for null values
+    print("\nNull Values in Each Column:")
+    print(combined_df.isnull().sum())
+    
+    # Check if there are any null values in the entire DataFrame
+    if combined_df.isnull().any().any():
+        print("\nThere are null values in the DataFrame.")
+    else:
+        print("\nThere are no null values in the DataFrame.")
+else:
+    print("No dataframes were loaded.")
+Explanation:
+.isnull().sum(): This counts the number of null values in each column.
+.isnull().any().any(): This checks if there are any null values in the entire DataFrame.
+Running the Script:
+Open your Python IDE or create a new Python script file (e.g., combine_and_clean_csvs.py).
+Copy and paste the script above into your Python environment or the new script file.
+Run the script:
+sh
+Copy code
+python combine_and_clean_csvs.py
+This script will search for the specified CSV files from January to December, load them into DataFrames, combine them into a single DataFrame, clean the data, and save the cleaned DataFrame to a new CSV file. Additionally, it will print the DataFrame information, describe the statistics, list the columns, display the shape, and check for null values.
+
+ok lets have som vis
+ChatGPT
+To visualize your data, you can use the matplotlib and seaborn libraries, which are commonly used for data visualization in Python. Below are some examples of visualizations you can create based on the columns you mentioned:
+
+Distribution of Searches by Type
+Gender Distribution
+Age Group Distribution
+Ethnicity Distribution
+Outcome Distribution
+Searches Over Time
+First, you need to install matplotlib and seaborn if you haven't already:
+
+sh
+Copy code
+pip install matplotlib seaborn
+Adding Visualization to Your Script
+Here’s how you can integrate basic visualizations into your script:
+
+python
+Copy code
+import pandas as pd
+import glob
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Define the base directory containing the monthly directories
+base_directory = r"C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023"
+
+# List to store all dataframes
+dfs = []
+
+# Loop over each month (1 to 12)
+for month in range(1, 13):
+    # Format the month to ensure two digits (e.g., 01, 02, ..., 12)
+    month_str = f"{month:02d}"
+    
+    # Define the directory for the current month
+    month_directory = os.path.join(base_directory, f"2023-{month_str}")
+    
+    # Define the file pattern to match the specific file for the current month
+    file_pattern = os.path.join(month_directory, f"2023-{month_str}-metropolitan-stop-and-search.csv")
+    
+    # Use glob to find the file matching the pattern
+    file_list = glob.glob(file_pattern)
+    
+    # Check if the file is found
+    if not file_list:
+        print(f"No matching CSV file found in the directory for 2023-{month_str}.")
+    else:
+        # There should be only one file matching the pattern
+        file_path = file_list[0]
+        
+        # Load the CSV file into a DataFrame
+        try:
+            df = pd.read_csv(file_path)
+            dfs.append(df)
+            print(f"File for 2023-{month_str} loaded successfully!")
+        except Exception as e:
+            print(f"Error reading the file for 2023-{month_str}: {e}")
+
+# Concatenate all dataframes vertically if any dataframes were loaded
+if dfs:
+    combined_df = pd.concat(dfs, ignore_index=True)
+    print("All files combined successfully!")
+    
+    # Convert the Date column to datetime and format it to only include the date part
+    combined_df['date'] = pd.to_datetime(combined_df['date']).dt.date
+    
+    # Rename columns to ensure they are all lower case and replace spaces with underscores
+    combined_df.columns = combined_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Display the first few rows of the combined DataFrame to check the changes
+    print(combined_df.head())
+    
+    # Save the cleaned DataFrame to a new CSV file if needed
+    output_path = r'C:\Users\jonne\Desktop\Metropolitan Police Data\StopandSearch2023\combined_cleaned.csv'
+    combined_df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+    
+    # Additional checks to inspect the DataFrame
+    print("\nDataFrame Info:")
+    print(combined_df.info())
+    
+    print("\nDataFrame Description:")
+    print(combined_df.describe())
+    
+   
+You dont have to rewrite all the codes, youve mentioned. I just need the vis codes :)
+ChatGPT
+Sure, here are the visualization codes for different aspects of your data using matplotlib and seaborn.
+
+Import the Libraries
+Make sure to import the necessary libraries at the beginning of your script:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+1. Distribution of Searches by Type
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+2. Gender Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+3. Age Group Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+4. Self-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='self_defined_ethnicity', order=combined_df['self_defined_ethnicity'].value_counts().index)
+plt.title('Self-defined Ethnicity Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Ethnicity')
+plt.show()
+5. Officer-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='officer_defined_ethnicity')
+plt.title('Officer-defined Ethnicity Distribution of Searches')
+plt.xlabel('Ethnicity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+6. Object of Search Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='object_search', order=combined_df['object_search'].value_counts().index)
+plt.title('Object of Search Distribution')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+7. Outcome Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='outcome', order=combined_df['outcome'].value_counts().index)
+plt.title('Outcome Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Outcome')
+plt.show()
+8. Searches Over Time
+python
+Copy code
+plt.figure(figsize=(12, 8))
+combined_df['date'] = pd.to_datetime(combined_df['date'])
+combined_df['month'] = combined_df['date'].dt.to_period('M')
+
+searches_over_time = combined_df['month'].value_counts().sort_index()
+searches_over_time.plot(kind='bar', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+Running the Visualizations
+After the script loads and combines your data, you can run the visualization codes to generate the plots. Make sure the combined DataFrame (combined_df) is correctly created before running these visualization codes.
+
+If you have any specific visualization requests or need further customization, feel free to ask!
+
+My data frame is df not combined sorry
+ChatGPT
+No problem! I'll adjust the visualization codes to use the df DataFrame instead of combined_df.
+
+Import the Libraries
+Ensure you import the necessary libraries at the beginning of your script:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+1. Distribution of Searches by Type
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+2. Gender Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+3. Age Group Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+4. Self-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='self_defined_ethnicity', order=df['self_defined_ethnicity'].value_counts().index)
+plt.title('Self-defined Ethnicity Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Ethnicity')
+plt.show()
+5. Officer-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='officer_defined_ethnicity')
+plt.title('Officer-defined Ethnicity Distribution of Searches')
+plt.xlabel('Ethnicity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+6. Object of Search Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='object_search', order=df['object_search'].value_counts().index)
+plt.title('Object of Search Distribution')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+7. Outcome Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='outcome', order=df['outcome'].value_counts().index)
+plt.title('Outcome Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Outcome')
+plt.show()
+8. Searches Over Time
+python
+Copy code
+plt.figure(figsize=(12, 8))
+df['date'] = pd.to_datetime(df['date'])
+df['month'] = df['date'].dt.to_period('M')
+
+searches_over_time = df['month'].value_counts().sort_index()
+searches_over_time.plot(kind='bar', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+Running the Visualizations
+Shows blank for all vis
+
+ChatGPT
+To address the issue of the visualizations appearing blank, let's ensure that your DataFrame df is correctly loaded and contains data. Here are a few steps to help diagnose and correct the issue:
+
+Check the DataFrame: Ensure that df is correctly loaded and contains data.
+Inspect Columns: Ensure that the columns used in the visualizations match the column names in your DataFrame.
+Display Data: Display the first few rows of the DataFrame to confirm the data is loaded.
+Let's first check and display the DataFrame:
+
+python
+Copy code
+# Display the first few rows of the DataFrame
+print(df.head())
+
+# Display DataFrame information
+print(df.info())
+
+# Display summary statistics
+print(df.describe())
+
+# Display the column names
+print(df.columns)
+Ensure Columns Exist
+Before running the visualizations, make sure that the necessary columns (type, gender, age, self_defined_ethnicity, officer_defined_ethnicity, object_search, outcome, date) exist in your DataFrame and contain data.
+
+Visualization Codes
+Here are the visualization codes again, ensuring that the DataFrame df is correctly used and the necessary libraries are imported:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Distribution of Searches by Type
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 2. Gender Distribution
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 3. Age Group Distribution
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 4. Self-defined Ethnicity Distribution
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='self_defined_ethnicity', order=df['self_defined_ethnicity'].value_counts().index)
+plt.title('Self-defined Ethnicity Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Ethnicity')
+plt.show()
+
+# 5. Officer-defined Ethnicity Distribution
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='officer_defined_ethnicity')
+plt.title('Officer-defined Ethnicity Distribution of Searches')
+plt.xlabel('Ethnicity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 6. Object of Search Distribution
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='object_search', order=df['object_search'].value_counts().index)
+plt.title('Object of Search Distribution')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+
+# 7. Outcome Distribution
+plt.figure(figsize=(12, 8))
+sns.countplot(data=df, y='outcome', order=df['outcome'].value_counts().index)
+plt.title('Outcome Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Outcome')
+plt.show()
+
+# 8. Searches Over Time
+plt.figure(figsize=(12, 8))
+df['date'] = pd.to_datetime(df['date'])
+df['month'] = df['date'].dt.to_period('M')
+
+searches_over_time = df['month'].value_counts().sort_index()
+searches_over_time.plot(kind='bar', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+Running the Checks and Visualizations
+Run the checks: Ensure that the DataFrame is correctly loaded and contains the necessary columns.
+Run the visualizations: Ensure that the plots are generated correctly.
+If you still encounter issues, please provide the output of the checks (df.head(), df.info(), df.describe(), and df.columns) to help diagnose the problem further.
+
+Apologies, it is combined_df
+ChatGPT
+No problem! Here are the visualization codes updated to use combined_df.
+
+Import the Libraries
+Ensure you import the necessary libraries at the beginning of your script:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+1. Distribution of Searches by Type
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+2. Gender Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+3. Age Group Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+4. Self-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='self_defined_ethnicity', order=combined_df['self_defined_ethnicity'].value_counts().index)
+plt.title('Self-defined Ethnicity Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Ethnicity')
+plt.show()
+5. Officer-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='officer_defined_ethnicity')
+plt.title('Officer-defined Ethnicity Distribution of Searches')
+plt.xlabel('Ethnicity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+6. Object of Search Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='object_search', order=combined_df['object_search'].value_counts().index)
+plt.title('Object of Search Distribution')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+7. Outcome Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='outcome', order=combined_df['outcome'].value_counts().index)
+plt.title('Outcome Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Outcome')
+plt.show()
+8. Searches Over Time
+python
+Copy code
+plt.figure(figsize=(12, 8))
+combined_df['date'] = pd.to_datetime(combined_df['date'])
+combined_df['month'] = combined_df['date'].dt.to_period('M')
+
+searches_over_time = combined_df['month'].value_counts().sort_index()
+searches_over_time.plot(kind='bar', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+Running the Visualizations
+After ensuring that combined_df is correctly loaded and contains data, you can run the above visualization codes to generate the plots.
+
+If you encounter any issues or have specific visualization requests, please let me know!
+
+Its showing blanks
+ChatGPT
+If the visualizations are showing up blank, it suggests that the DataFrame might not contain the expected data or the columns might not be correctly referenced. Let's diagnose the issue step by step:
+
+Check DataFrame Structure:
+Ensure that combined_df is correctly loaded and contains the necessary columns.
+
+Check Column Names:
+Ensure that the column names in the DataFrame match those used in the visualization code.
+
+Step 1: Check DataFrame Structure
+Let's inspect the DataFrame:
+
+python
+Copy code
+# Display the first few rows of the DataFrame
+print(combined_df.head())
+
+# Display DataFrame information
+print(combined_df.info())
+
+# Display summary statistics
+print(combined_df.describe())
+
+# Display the column names
+print(combined_df.columns)
+Step 2: Update Visualization Code if Necessary
+Ensure that the column names used in the visualization code match those in the DataFrame.
+
+Sample Output Check
+If combined_df is loaded correctly and contains the expected columns, you should see output similar to:
+
+scss
+Copy code
+print(combined_df.head())
+plaintext
+Copy code
+                  date  type  gender     age          self_defined_ethnicity officer_defined_ethnicity                     object_search                     outcome
+0  2023-01-01T00:00:00  Person search  Male   18-24  Asian/Asian British - Indian  Asian  Controlled drugs  a no further action disposal
+1  2023-01-01T00:00:00  Person search  Female  25-34  Black/African/Caribbean/Black British - African  Black  Evidence of offences under the Act  Arrest
+...
+Step 3: Correct Visualization Code
+Ensure that the column names in the visualization code are correctly referenced. If necessary, update the column names in the visualization code to match those in your DataFrame.
+
+Example Visualizations
+Here's a full example to visualize the data if everything is correct:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Distribution of Searches by Type
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 2. Gender Distribution
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 3. Age Group Distribution
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+
+# 4. Self-defined Ethnicity Distribution
+plt.figure(figsize
+Sorry, is it case sensitive, let me share the columns again
+Type: Person search, Person and Vehicle search
+Date: 2023-01-01T00:00:00+00:00 (perhaps change this to just dates?)
+Latitude
+Longitude
+Gender: Male, Female, Other
+Age: 18-24, 25-34, over 34, Under 10
+Self-defined ethnicity: Asian/Asian British - Any other Asian background, Asian/Asian British - Bangladeshi,  Asian/Asian British - Chinese, Asian/Asian British - Indian, Asian/Asian British - Pakistani, Black/African/Caribbean/Black British - African, Black/African/Caribbean/Black British - Any other Black/African/Caribbean background, Black/African/Caribbean/Black British - Caribbean, Mixed/Multiple ethnic groups - Any other Mixed/Multiple ethnic background, Mixed/Multiple ethnic groups - White and Asian, Mixed/Multiple ethnic groups - White and Black African, Mixed/Multiple ethnic groups - White and Black Caribbean, Other ethnic group - Any other ethnic group, Other ethnic group - Not stated, White - Any other White background, White - English/Welsh/Scottish/Northern Irish/British, White - Irish
+Officer-defined-ethnicity: Asian, Black, White, Other
+Object search: Anything to threaten or harm anyone, Articles for use in criminal damage, Controlled drugs, Evidence of offences under the Act, Firearms, Fireworks, Offensive weapons, Stolen goods
+Outcome: a no further action disposal, Arrest, Caution (simple or conditional), Community resolution, Penalty Notice for Disorder, Summons / charged by post
+ChatGPT
+Thanks for providing the column details. Yes, column names in pandas are case-sensitive. Let's ensure the column names in the visualization code match exactly with those in your DataFrame.
+
+Here's the updated visualization code considering the column names you've provided:
+
+Import the Libraries
+Ensure you import the necessary libraries at the beginning of your script:
+
+python
+Copy code
+import matplotlib.pyplot as plt
+import seaborn as sns
+1. Distribution of Searches by Type
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='Type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+2. Gender Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='Gender')
+plt.title('Gender Distribution of Searches')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+3. Age Group Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='Age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+4. Self-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='Self-defined ethnicity', order=combined_df['Self-defined ethnicity'].value_counts().index)
+plt.title('Self-defined Ethnicity Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Ethnicity')
+plt.show()
+5. Officer-defined Ethnicity Distribution
+python
+Copy code
+plt.figure(figsize=(10, 6))
+sns.countplot(data=combined_df, x='Officer-defined-ethnicity')
+plt.title('Officer-defined Ethnicity Distribution of Searches')
+plt.xlabel('Ethnicity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.show()
+6. Object of Search Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='Object search', order=combined_df['Object search'].value_counts().index)
+plt.title('Object of Search Distribution')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+7. Outcome Distribution
+python
+Copy code
+plt.figure(figsize=(12, 8))
+sns.countplot(data=combined_df, y='Outcome', order=combined_df['Outcome'].value_counts().index)
+plt.title('Outcome Distribution of Searches')
+plt.xlabel('Count')
+plt.ylabel('Outcome')
+plt.show()
+8. Searches Over Time
+First, we need to ensure the 'Date' column is converted correctly:
+
+python
+Copy code
+combined_df['Date'] = pd.to_datetime(combined_df['Date']).dt.date
+Then plot the searches over time:
+
+python
+Copy code
+plt.figure(figsize=(12, 8))
+combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+combined_df['Month'] = combined_df['Date'].dt.to_period('M')
+
+searches_over_time = combined_df['Month'].value_counts().sort_index()
+searches_over_time.plot(kind='bar', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+Running the Visualizations
+Ensure the DataFrame combined_df is correctly loaded and contains the data with the exact column names. Run the visualization codes provided to generate the plots. If you encounter any issues, please provide the output of combined_df.head(), combined_df.info(), and combined_df.columns.
+
+I want to shome some annotations, highest etc, trends, patterns, can we also do heatmap correlation maybe? pair plot?
+ChatGPT
+Sure! Let's create some advanced visualizations with annotations, trends, patterns, a heatmap for correlation, and a pair plot.
+
+1. Distribution of Searches by Type with Annotations
+python
+Copy code
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Type')
+plt.title('Distribution of Searches by Type')
+plt.xlabel('Type of Search')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    ax.annotate(f'{p.get_height()}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+2. Searches Over Time with Trend Line
+python
+Copy code
+plt.figure(figsize=(12, 8))
+combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+combined_df['Month'] = combined_df['Date'].dt.to_period('M')
+
+searches_over_time = combined_df['Month'].value_counts().sort_index()
+searches_over_time.plot(kind='line', marker='o', figsize=(12, 8))
+
+plt.title('Number of Searches Over Time')
+plt.xlabel('Month')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+
+# Highlight the highest and lowest points
+max_searches = searches_over_time.max()
+min_searches = searches_over_time.min()
+max_month = searches_over_time.idxmax()
+min_month = searches_over_time.idxmin()
+
+plt.annotate(f'Highest: {max_searches}', xy=(max_month.start_time, max_searches), 
+             xytext=(max_month.start_time, max_searches + 50),
+             arrowprops=dict(facecolor='green', shrink=0.05))
+
+plt.annotate(f'Lowest: {min_searches}', xy=(min_month.start_time, min_searches), 
+             xytext=(min_month.start_time, min_searches + 50),
+             arrowprops=dict(facecolor='red', shrink=0.05))
+
+plt.show()
+3. Heatmap for Correlation
+Before creating the heatmap, ensure that all numerical columns are correctly represented.
+
+python
+Copy code
+# If necessary, encode categorical variables
+encoded_df = combined_df.copy()
+encoded_df['Gender'] = encoded_df['Gender'].astype('category').cat.codes
+encoded_df['Age'] = encoded_df['Age'].astype('category').cat.codes
+encoded_df['Type'] = encoded_df['Type'].astype('category').cat.codes
+encoded_df['Self-defined ethnicity'] = encoded_df['Self-defined ethnicity'].astype('category').cat.codes
+encoded_df['Officer-defined-ethnicity'] = encoded_df['Officer-defined-ethnicity'].astype('category').cat.codes
+encoded_df['Object search'] = encoded_df['Object search'].astype('category').cat.codes
+encoded_df['Outcome'] = encoded_df['Outcome'].astype('category').cat.codes
+
+# Calculate correlation
+corr = encoded_df.corr()
+
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation Heatmap')
+plt.show()
+4. Pair Plot
+The pair plot helps visualize relationships between variables.
+
+python
+Copy code
+sns.pairplot(encoded_df, hue='Gender')
+plt.suptitle('Pair Plot of Encoded Data', y=1.02)
+plt.show()
+5. Additional Trends and Patterns
+For additional trends and patterns, we can look at specific relationships between variables.
+
+Example: Age Group vs. Outcome
+python
+Copy code
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age', hue='Outcome')
+plt.title('Outcome by Age Group')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+plt.show()
+These visualizations will help you identify and highlight key patterns, trends, and correlations in your data. Adjust the code as needed based on your specific data and requirements.
+
+The age shows blank.
+Heres the structure again.
+Age: 18-24, 25-34, over 34, Under 10
+ChatGPT
+The issue with the age column showing blanks in the visualization could be due to the column name or the specific values in your DataFrame. Let's make sure we handle the column names correctly and update the visualization code accordingly.
+
+Here are the updated steps:
+
+Check the Column Names
+First, let's ensure the column names are correctly identified:
+
+python
+Copy code
+print(combined_df.columns)
+If the column name for age is confirmed as "Age", we can proceed with the visualizations.
+
+Distribution of Searches by Age Group with Annotations
+python
+Copy code
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+Outcome by Age Group
+python
+Copy code
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age', hue='Outcome')
+plt.title('Outcome by Age Group')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+plt.show()
+Check and Print the First Few Rows
+To verify the contents of the 'Age' column, let's print the first few rows of the DataFrame:
+
+python
+Copy code
+print(combined_df[['Age']].head(10))
+Complete Updated Code
+Here is the complete updated code including the correlation heatmap and pair plot:
+
+python
+Copy code
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# 1. Distribution of Searches by Age Group with Annotations
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Age')
+plt.title('Age Group Distribution of Searches')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+
+# 2. Outcome by Age Group
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age', hue='Outcome')
+plt.title('Outcome by Age Group')
+plt.xlabel('Age Group')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points
+Heres the result.
+Index(['Type', 'Date', 'Part of a policing operation', 'Policing operation',
+       'Latitude', 'Longitude', 'Gender', 'Age range',
+       'Self-defined ethnicity', 'Officer-defined ethnicity', 'Legislation',
+       'Object of search', 'Outcome', 'Outcome linked to object of search',
+       'Removal of more than just outer clothing', 'Month'],
+      dtype='object')
+ChatGPT
+The column for age is labeled as "Age range". Let's update the visualization code accordingly to use this column name.
+
+Distribution of Searches by Age Range with Annotations
+python
+Copy code
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Age range')
+plt.title('Age Range Distribution of Searches')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+Outcome by Age Range
+python
+Copy code
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age range', hue='Outcome')
+plt.title('Outcome by Age Range')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+plt.show()
+Check and Print the First Few Rows
+To verify the contents of the 'Age range' column, let's print the first few rows of the DataFrame:
+
+python
+Copy code
+print(combined_df[['Age range']].head(10))
+Complete Updated Code
+Here is the complete updated code including the correlation heatmap and pair plot, now using "Age range":
+
+python
+Copy code
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# 1. Distribution of Searches by Age Range with Annotations
+plt.figure(figsize=(10, 6))
+ax = sns.countplot(data=combined_df, x='Age range')
+plt.title('Age Range Distribution of Searches')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 9), textcoords='offset points')
+
+plt.show()
+
+# 2. Outcome by Age Range
+plt.figure(figsize=(12, 8))
+ax = sns.countplot(data=combined_df, x='Age range', hue='Outcome')
+plt.title('Outcome by Age Range')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Annotate the bars
+for p in ax.patches:
+    height = p.get_height()
+    ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+plt.show()
+
+# Check the first few rows of the 'Age range' column
+print(combined_df[['Age range']].head(10))
+
+# 3. Heatmap for Correlation
+# If necessary, encode categorical variables
+encoded_df = combined_df.copy()
+encoded_df['Gender'] = encoded_df['Gender'].astype('category').cat.codes
+encoded_df['Age range'] = encoded_df['Age range'].astype('category').cat.codes
+encoded_df['Type'] = encoded_df['Type'].astype('category').cat.codes
+encoded_df['Self-defined ethnicity'] = encoded_df['Self-defined ethnicity'].astype('category').cat.codes
+encoded_df['Officer-defined ethnicity'] = encoded_df['Officer-defined ethnicity'].astype('category').cat.codes
+encoded_df['Object of search'] = encoded_df['Object of search'].astype('category').cat.codes
+encoded_df['Outcome'] = encoded_df['Outcome'].astype('category').cat.codes
+
+# Calculate correlation
+corr = encoded_df.corr()
+
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation Heatmap')
+plt.show()
+
+# 4. Pair Plot
+sns.pairplot(encoded_df, hue='Gender')
+plt.suptitle('Pair Plot of Encoded Data', y=1.02)
+plt.show()
+These updates should correctly display the visualizations using the "Age range" column and provide insights into your data.
+
+Can you show me the heatmap for correlation on a seperate box please?
+ChatGPT
+Certainly! Below is the code to create and display the correlation heatmap separately:
+
+python
+Copy code
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Encode categorical variables for correlation
+encoded_df = combined_df.copy()
+encoded_df['Gender'] = encoded_df['Gender'].astype('category').cat.codes
+encoded_df['Age range'] = encoded_df['Age range'].astype('category').cat.codes
+encoded_df['Type'] = encoded_df['Type'].astype('category').cat.codes
+encoded_df['Self-defined ethnicity'] = encoded_df['Self-defined ethnicity'].astype('category').cat.codes
+encoded_df['Officer-defined ethnicity'] = encoded_df['Officer-defined ethnicity'].astype('category').cat.codes
+encoded_df['Object of search'] = encoded_df['Object of search'].astype('category').cat.codes
+encoded_df['Outcome'] = encoded_df['Outcome'].astype('category').cat.codes
+
+# Calculate correlation
+corr = encoded_df.corr()
+
+# Plot the correlation heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation Heatmap')
+plt.show()
+This code will create a separate box for the correlation heatmap:
+
+Import Libraries: Ensure pandas, seaborn, and matplotlib are imported.
+Encode Categorical Variables: Convert categorical variables to numerical codes for correlation calculation.
+Calculate Correlation: Use encoded_df.corr() to compute the correlation matrix.
+Plot Heatmap: Use sns.heatmap() to visualize the correlation matrix with annotations.
+When you run this code, it will display the correlation heatmap in a separate plot, providing insights into how different variables are correlated with each other.
+
+It shows blank
+ChatGPT
+If the heatmap is showing as blank, it might be due to the presence of NaN values or non-numeric data that didn't get encoded correctly. Let's first ensure that there are no NaN values in the DataFrame after encoding. We can handle this by filling NaN values with a placeholder before encoding.
+
+Here's a revised approach to ensure all steps are handled correctly:
+
+Fill NaN values.
+Encode categorical variables.
+Calculate and plot the correlation heatmap.
+python
+Copy code
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Fill NaN values with a placeholder (e.g., 'Unknown' or -1)
+combined_df = combined_df.fillna('Unknown')
+
+# Encode categorical variables for correlation
+encoded_df = combined_df.copy()
+encoded_df['Gender'] = encoded_df['Gender'].astype('category').cat.codes
+encoded_df['Age range'] = encoded_df['Age range'].astype('category').cat.codes
+encoded_df['Type'] = encoded_df['Type'].astype('category').cat.codes
+encoded_df['Self-defined ethnicity'] = encoded_df['Self-defined ethnicity'].astype('category').cat.codes
+encoded_df['Officer-defined ethnicity'] = encoded_df['Officer-defined ethnicity'].astype('category').cat.codes
+encoded_df['Object of search'] = encoded_df['Object of search'].astype('category').cat.codes
+encoded_df['Outcome'] = encoded_df['Outcome'].astype('category').cat.codes
+
+# Calculate correlation
+corr = encoded_df.corr()
+
+# Plot the correlation heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation Heatmap')
+plt.show()
+This code includes steps to handle NaN values and ensures that categorical variables are encoded correctly before calculating the correlation matrix and plotting the heatmap.
+
+Still showing blank, shall we just do correlation between Age range, Officer-defined ethnicity and perhaps outcome? like a frequency heatmap or something
+ChatGPT
+Let's create a frequency heatmap to visualize the relationships between "Age range", "Officer-defined ethnicity", and "Outcome". We'll use the pd.crosstab() function to generate a frequency table and then plot it as a heatmap.
+
+Here's how to do it:
+
+python
+Copy code
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Fill NaN values with a placeholder (e.g., 'Unknown' or -1)
+combined_df = combined_df.fillna('Unknown')
+
+# Create a frequency table for Age range vs Officer-defined ethnicity
+age_officer_freq = pd.crosstab(combined_df['Age range'], combined_df['Officer-defined ethnicity'])
+
+# Plot the frequency heatmap for Age range vs Officer-defined ethnicity
+plt.figure(figsize=(12, 8))
+sns.heatmap(age_officer_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Age range vs Officer-defined ethnicity')
+plt.xlabel('Officer-defined ethnicity')
+plt.ylabel('Age range')
+plt.show()
+
+# Create a frequency table for Age range vs Outcome
+age_outcome_freq = pd.crosstab(combined_df['Age range'], combined_df['Outcome'])
+
+# Plot the frequency heatmap for Age range vs Outcome
+plt.figure(figsize=(12, 8))
+sns.heatmap(age_outcome_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Age range vs Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Age range')
+plt.show()
+
+# Create a frequency table for Officer-defined ethnicity vs Outcome
+officer_outcome_freq = pd.crosstab(combined_df['Officer-defined ethnicity'], combined_df['Outcome'])
+
+# Plot the frequency heatmap for Officer-defined ethnicity vs Outcome
+plt.figure(figsize=(12, 8))
+sns.heatmap(officer_outcome_freq, annot=True, fmt='d', cmap='YlGnBu')
+plt.title('Frequency Heatmap: Officer-defined ethnicity vs Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Officer-defined ethnicity')
+plt.show()
+This code does the following:
+
+Creates frequency tables:
+
+age_officer_freq for "Age range" vs "Officer-defined ethnicity".
+age_outcome_freq for "Age range" vs "Outcome".
+officer_outcome_freq for "Officer-defined ethnicity" vs "Outcome".
+Plots heatmaps:
+
+The frequency of occurrences for each pair of categories in the respective frequency tables is visualized.
+These frequency heatmaps will help you visualize the distribution and relationships between these categorical variables.
+
+I really want to show a heatmap of locations. My data has longitudes and latitudes.
+ChatGPT
+To create a heatmap of locations based on longitude and latitude data, you can use the folium library to create an interactive map with a heatmap overlay. Here's how you can do it:
+
+First, make sure you have folium and pandas installed. You can install folium if you haven't already:
+
+bash
+Copy code
+pip install folium
+Then, use the following code to create a heatmap of locations:
+
+python
+Copy code
+import pandas as pd
+import folium
+from folium.plugins import HeatMap
+
+# Assuming combined_df is already loaded and available
+
+# Display the first few rows and the column names to verify the structure
+print(combined_df.columns)
+print(combined_df.head())
+
+# Fill NaN values with a placeholder (e.g., 'Unknown' or -1)
+combined_df = combined_df.fillna('Unknown')
+
+# Ensure that latitude and longitude are numeric
+combined_df['Latitude'] = pd.to_numeric(combined_df['Latitude'], errors='coerce')
+combined_df['Longitude'] = pd.to_numeric(combined_df['Longitude'], errors='coerce')
+
+# Drop rows with NaN values in Latitude and Longitude
+combined_df = combined_df.dropna(subset=['Latitude', 'Longitude'])
+
+# Create a base map
+map_center = [combined_df['Latitude'].mean(), combined_df['Longitude'].mean()]
+mymap = folium.Map(location=map_center, zoom_start=10)
+
+# Prepare data for the heatmap
+heat_data = [[row['Latitude'], row['Longitude']] for index, row in combined_df.iterrows()]
+
+# Add heatmap to the base map
+HeatMap(heat_data).add_to(mymap)
+
+# Save the map to an HTML file
+mymap.save('heatmap.html')
+
+# To display the map directly in a Jupyter notebook (if you are using one)
+#mymap
+This code does the following:
+
+Ensure valid data:
+
+Converts Latitude and Longitude columns to numeric values, coercing errors to NaN.
+Drops rows with NaN values in Latitude and Longitude.
+Create a base map:
+
+Calculates the center of the map based on the mean latitude and longitude values.
+Creates a Folium map centered at the calculated mean location.
+Prepare data for the heatmap:
+
+Creates a list of [Latitude, Longitude] pairs for the heatmap.
+Add heatmap to the map:
+
+Adds the heatmap overlay to the base map using the HeatMap function.
+Save the map:
+
+Saves the interactive map to an HTML file named heatmap.html.
+You can open heatmap.html in a web browser to view the interactive heatmap of locations. If you're using a Jupyter notebook, you can display the map directly by uncommenting mymap at the end of the code.
+
+Thanks that works!
+ChatGPT
+Great to hear that it works! If you have any further questions or need additional visualizations or analysis, feel free to ask. Happy coding!
+
+
+1/2
+
+Not sure what else can we show in terms of vis, anything interseting you recommend?
+ChatGPT
+Certainly! Here are a few more interesting visualizations and analyses you can consider to gain further insights from your dataset:
+
+1. Bar Plot of Outcomes by Age Range
+Visualize the distribution of outcomes for different age ranges:
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(12, 6))
+sns.countplot(data=combined_df, x='Age range', hue='Outcome')
+plt.title('Outcomes by Age Range')
+plt.xlabel('Age Range')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.legend(title='Outcome')
+plt.show()
+
+2. Distribution of Searches Over Time
+Plot the number of searches over time to identify any trends or patterns:
+
+# Convert Date to datetime format if not already done
+combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+
+plt.figure(figsize=(12, 6))
+combined_df['Date'].value_counts().sort_index().plot()
+plt.title('Number of Searches Over Time')
+plt.xlabel('Date')
+plt.ylabel('Number of Searches')
+plt.xticks(rotation=45)
+plt.show()
+
+3. Pie Chart of Officer-Defined Ethnicity
+Visualize the proportion of different officer-defined ethnicities:
+
+officer_ethnicity_counts = combined_df['Officer-defined ethnicity'].value_counts()
+
+plt.figure(figsize=(8, 8))
+officer_ethnicity_counts.plot.pie(autopct='%1.1f%%', startangle=140, cmap='Set3')
+plt.title('Officer-Defined Ethnicity Distribution')
+plt.ylabel('')
+plt.show()
+
+4. Bar Plot of Object of Search
+Visualize the frequency of different objects searched for:
+
+plt.figure(figsize=(12, 6))
+sns.countplot(data=combined_df, y='Object of search', order=combined_df['Object of search'].value_counts().index)
+plt.title('Frequency of Objects of Search')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.show()
+
+5. Box Plot of Latitude and Longitude by Outcome
+Analyze the geographic spread of different outcomes:
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=combined_df, x='Outcome', y='Latitude')
+plt.title('Latitude Distribution by Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Latitude')
+plt.xticks(rotation=45)
+plt.show()
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=combined_df, x='Outcome', y='Longitude')
+plt.title('Longitude Distribution by Outcome')
+plt.xlabel('Outcome')
+plt.ylabel('Longitude')
+plt.xticks(rotation=45)
+plt.show()
+
+6. Pair Plot
+A pair plot can help you visualize pairwise relationships in your dataset. This can be particularly useful if you have numerical features and want to see how they correlate with each other.
+
+import seaborn as sns
+
+# Selecting a subset of columns for the pair plot
+subset_df = combined_df[['Latitude', 'Longitude', 'Age range', 'Outcome']].copy()
+
+# Encode categorical columns
+subset_df['Age range'] = subset_df['Age range'].astype('category').cat.codes
+subset_df['Outcome'] = subset_df['Outcome'].astype('category').cat.codes
+
+sns.pairplot(subset_df, hue='Outcome')
+plt.show()
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Calculate the count of each outcome for each object of search
+grouped_data = combined_df.groupby(['Object of search', 'Outcome']).size().reset_index(name='count')
+
+# Calculate the total count for each object of search
+total_counts = grouped_data.groupby('Object of search')['count'].sum().reset_index(name='total_count')
+
+# Merge total counts with grouped data
+grouped_data = pd.merge(grouped_data, total_counts, on='Object of search')
+
+# Sort the object of search based on total count
+sorted_objects = total_counts.sort_values(by='total_count', ascending=False)['Object of search']
+grouped_data['Object of search'] = pd.Categorical(grouped_data['Object of search'], categories=sorted_objects, ordered=True)
+
+# Set the size of the plot
+plt.figure(figsize=(14, 10))
+
+# Create a grouped barplot with switched axes
+barplot = sns.barplot(data=grouped_data, x='count', y='Object of search', hue='Outcome', orient='h')
+
+# Set plot title and labels
+plt.title('Distribution of Outcomes by Object of Search')
+plt.xlabel('Count')
+plt.ylabel('Object of Search')
+plt.legend(title='Outcome', bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjust legend position
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+import seaborn as sns
+
+# Pivot the data for heatmap
+heatmap_data = grouped_data.pivot('Age range', 'Object of search', 'count').fillna(0)
+
+# Set the size of the plot
+plt.figure(figsize=(14, 10))
+
+# Create a heatmap
+sns.heatmap(heatmap_data, annot=True, fmt='g', cmap='Blues')
+
+# Set plot title and labels
+plt.title('Heatmap of Age Range by Top 3 Objects of Search')
+plt.xlabel('Object of Search')
+plt.ylabel('Age Range')
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+Distribution of Age Range by Top 3 Objects of Search
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Filter the data for the top three objects of search
+top_objects = ['Controlled drugs', 'Offensive weapons', 'Stolen goods']
+filtered_data = combined_df[combined_df['Object of search'].isin(top_objects)]
+
+# Group by "Object of search" and "Age range" and calculate the counts
+grouped_data = filtered_data.groupby(['Object of search', 'Age range']).size().reset_index(name='count')
+
+# Sort the age range for a better visual ordering
+age_order = ['Under 10', '18-24', '25-34', 'over 34']
+grouped_data['Age range'] = pd.Categorical(grouped_data['Age range'], categories=age_order, ordered=True)
+
+# Set the size of the plot
+plt.figure(figsize=(14, 10))
+
+# Create a grouped barplot
+barplot = sns.barplot(data=grouped_data, x='count', y='Age range', hue='Object of search', orient='h')
+
+# Set plot title and labels
+plt.title('Distribution of Age Range by Top 3 Objects of Search')
+plt.xlabel('Count')
+plt.ylabel('Age Range')
+plt.legend(title='Object of Search', bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjust legend position
+
+# Calculate total counts for each age range
+age_totals = grouped_data.groupby('Age range')['count'].sum().to_dict()
+
+# Add annotations for percentages
+for index, row in grouped_data.iterrows():
+    total = age_totals[row['Age range']]
+    percentage = (row['count'] / total) * 100
+    barplot.text(
+        row['count'] + 10,  # Adjust the position slightly to the right of the bar
+        index,
+        f"{percentage:.0f}%",  # Format percentage with 0 decimal points
+        color='black',
+        ha="center",
+        va='center'
+    )
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Group by "Object of search" and "Officer-defined ethnicity" and calculate the counts
+grouped_data = filtered_data.groupby(['Object of search', 'Officer-defined ethnicity']).size().reset_index(name='count')
+
+# Set the size of the plot
+plt.figure(figsize=(14, 10))
+
+# Create a grouped barplot
+barplot = sns.barplot(data=grouped_data, x='count', y='Officer-defined ethnicity', hue='Object of search', orient='h')
+
+# Set plot title and labels
+plt.title('Distribution of Officer-defined Ethnicity by Top 3 Objects of Search')
+plt.xlabel('Count')
+plt.ylabel('Officer-defined Ethnicity')
+
+# Place the legend inside the plot at the top right corner
+plt.legend(title='Object of Search', loc='upper right', bbox_to_anchor=(1, 1))
+
+# Calculate total counts for each officer-defined ethnicity
+ethnicity_totals = grouped_data.groupby('Officer-defined ethnicity')['count'].sum().to_dict()
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
